@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:convert';
 import 'statistics_screen.dart';
+import 'debt_screen.dart'; // <-- YANGI QO'SHILGAN QATOR (Qarz daftari uchun)
 
 const String expensesBoxName = 'expenses_box';
 const String passwordBoxName = 'password_box';
@@ -786,6 +787,25 @@ class _HomePageState extends State<HomePage> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          // ==========================================
+          // YANGI QO'SHILGAN QARZ DAFTARI TUGMASI
+          // ==========================================
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet),
+            tooltip: 'Qarz daftari',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DebtScreen(
+                    onThemeChanged: widget.onThemeChanged,
+                    currentTheme: _currentTheme,
+                  ),
+                ),
+              );
+            },
+          ),
+          // ==========================================
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {
