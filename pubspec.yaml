@@ -28,22 +28,17 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/
 
 flutter_native_splash:
-  # Kun (light) rejim uchun
+  # Kun (light) rejim uchun - faqat rang
   color: "#667eea"
-  image: assets/splash_logo.png
   
-  # Tun (dark) rejim uchun
+  # Tun (dark) rejim uchun - faqat rang
   color_dark: "#1a1a2e"
-  image_dark: assets/splash_logo.png
 
+  # Android 12+ uchun
   android_12:
     color: "#667eea"
     color_dark: "#1a1a2e"
     icon_background_color: "#667eea"
     icon_background_color_dark: "#1a1a2e"
-    image: assets/splash_logo.png
-    image_dark: assets/splash_logo.png

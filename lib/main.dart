@@ -1,14 +1,18 @@
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'dart:convert';
 import 'statistics_screen.dart';
 import 'debt_screen.dart';
 import 'firebase_service.dart';
 import 'auth_service.dart';
 import 'login_screen.dart';
+import 'theme/app_theme.dart';
+import 'widgets/modern_button.dart';
+import 'widgets/modern_card.dart';
+import 'widgets/modern_text_field.dart';
 
 const String expensesBoxName = 'expenses_box';
 const String settingsBoxName = 'settings_box';
@@ -21,12 +25,13 @@ String formatMoney(double amount) {
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding); // <-- Splash screen'ni saqlash
-  
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   await Firebase.initializeApp();
   await Hive.initFlutter();
   runApp(const MyApp());
 }
+
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -76,25 +81,10 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Kunlik xarajatlar',
-      debugShowCheckedModeBanner: false, // <-- Qizil DEBUG yozuvini o'chiradi
+      debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
-      theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.white,
-      ),
-      darkTheme: ThemeData(
-        primarySwatch: Colors.indigo,
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF667eea),
-          secondary: Color(0xFF764ba2),
-          surface: Color(0xFF1E1E1E),
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       home: LoginScreen(
         onThemeChanged: setThemeMode,
         currentTheme: _themeMode,
@@ -184,6 +174,17 @@ class _HomePageState extends State<HomePage> {
     'Boshqa': Icons.category,
   };
 
+  final Map<String, Color> categoryColors = {
+    'Yo\'l': AppTheme.infoColor,
+    'Yoqilg\'i': AppTheme.warningColor,
+    'Oziq-ovqat': AppTheme.primaryColor,
+    'Kiyim-kechak': AppTheme.accentColor,
+    'Kommunal': AppTheme.successColor,
+    'Ko\'ngilochar': const Color(0xFFf472b6),
+    'Sog\'liq': const Color(0xFFfb7185),
+    'Boshqa': Colors.grey,
+  };
+
   final List<String> categories = [
     'Barchasi',
     'Yo\'l',
@@ -209,9 +210,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     _expensesBox = await Hive.openBox(expensesBoxName);
-    
+
     final firebaseExpenses = await FirebaseService.loadExpenses();
-    
+
     if (firebaseExpenses.isNotEmpty) {
       setState(() {
         expenses = firebaseExpenses.map((e) => Expense.fromMap(e)).toList();
@@ -232,7 +233,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadStartDate() async {
     final box = await Hive.openBox(settingsBoxName);
     final String? savedDate = box.get('start_date');
-    
+
     if (savedDate != null) {
       setState(() {
         _startDate = DateTime.parse(savedDate);
@@ -251,7 +252,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _saveData() async {
     final String encodedData = jsonEncode(expenses.map((e) => e.toMap()).toList());
     await _expensesBox.put('expenses_list', encodedData);
-    
+
     final List<Map<String, dynamic>> expensesMaps = expenses.map((e) => e.toMap()).toList();
     await FirebaseService.saveExpenses(expensesMaps);
   }
@@ -294,29 +295,29 @@ class _HomePageState extends State<HomePage> {
     }
 
     final now = DateTime.now();
-    
+
     if (selectedDateFilter == 'Bugun') {
       result = result.where((e) =>
-        e.date.year == now.year && e.date.month == now.month && e.date.day == now.day
-      ).toList();
-    } 
-    else if (selectedDateFilter == 'Kecha') {
+          e.date.year == now.year && e.date.month == now.month && e.date.day == now.day).toList();
+    } else if (selectedDateFilter == 'Kecha') {
       final yesterday = now.subtract(const Duration(days: 1));
       result = result.where((e) =>
-        e.date.year == yesterday.year && e.date.month == yesterday.month && e.date.day == yesterday.day
-      ).toList();
-    } 
-    else if (selectedDateFilter == 'Shu hafta') {
+          e.date.year == yesterday.year &&
+          e.date.month == yesterday.month &&
+          e.date.day == yesterday.day).toList();
+    } else if (selectedDateFilter == 'Shu hafta') {
       final mondayOfThisWeek = now.subtract(Duration(days: now.weekday - 1));
-      final startOfMonday = DateTime(mondayOfThisWeek.year, mondayOfThisWeek.month, mondayOfThisWeek.day);
-      result = result.where((e) => 
-        e.date.isAfter(startOfMonday) || e.date.isAtSameMomentAs(startOfMonday)
-      ).toList();
-    } 
-    else if (selectedDateFilter == 'Shu oy') {
-      result = result.where((e) =>
-        e.date.year == now.year && e.date.month == now.month
-      ).toList();
+      final startOfMonday = DateTime(
+          mondayOfThisWeek.year, mondayOfThisWeek.month, mondayOfThisWeek.day);
+      result = result
+          .where((e) =>
+              e.date.isAfter(startOfMonday) ||
+              e.date.isAtSameMomentAs(startOfMonday))
+          .toList();
+    } else if (selectedDateFilter == 'Shu oy') {
+      result = result
+          .where((e) => e.date.year == now.year && e.date.month == now.month)
+          .toList();
     }
 
     return result;
@@ -329,7 +330,7 @@ class _HomePageState extends State<HomePage> {
   Future<bool> askPassword() async {
     final box = await Hive.openBox(passwordBoxName);
     final savedPassword = box.get('app_password');
-    
+
     final controller = TextEditingController();
     bool result = false;
 
@@ -337,11 +338,21 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
-              Icon(Icons.lock, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.indigo),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.lock, color: AppTheme.primaryColor, size: 20),
+              ),
               const SizedBox(width: 10),
-              Text('Parolni kiriting', style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+              const Text('Parolni kiriting'),
             ],
           ),
           content: TextField(
@@ -371,7 +382,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Parol noto\'g\'ri!'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.errorColor,
                     ),
                   );
                 }
@@ -388,7 +399,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _changePassword() async {
     final box = await Hive.openBox(passwordBoxName);
     final savedPassword = box.get('app_password');
-    
+
     final currentController = TextEditingController();
     final newController = TextEditingController();
     final confirmController = TextEditingController();
@@ -397,38 +408,38 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (context) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Parolni o\'zgartirish'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              ModernTextField(
                 controller: currentController,
+                hintText: 'Joriy parol',
+                labelText: 'Joriy parol',
+                prefixIcon: Icons.lock_outline,
                 obscureText: true,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Joriy parol',
-                  border: OutlineInputBorder(),
-                ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              ModernTextField(
                 controller: newController,
+                hintText: 'Yangi parol',
+                labelText: 'Yangi parol',
+                prefixIcon: Icons.lock,
                 obscureText: true,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Yangi parol',
-                  border: OutlineInputBorder(),
-                ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              ModernTextField(
                 controller: confirmController,
+                hintText: 'Yangi parolni tasdiqlang',
+                labelText: 'Tasdiqlash',
+                prefixIcon: Icons.lock_clock,
                 obscureText: true,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Yangi parolni tasdiqlang',
-                  border: OutlineInputBorder(),
-                ),
               ),
             ],
           ),
@@ -443,7 +454,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Joriy parol noto\'g\'ri!'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.errorColor,
                     ),
                   );
                   return;
@@ -452,7 +463,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Yangi parol kamida 4 ta raqam bo\'lishi kerak!'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.errorColor,
                     ),
                   );
                   return;
@@ -461,7 +472,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Yangi parollar mos kelmadi!'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppTheme.errorColor,
                     ),
                   );
                   return;
@@ -472,7 +483,7 @@ class _HomePageState extends State<HomePage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Parol muvaffaqiyatli o\'zgartirildi!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppTheme.successColor,
                   ),
                 );
               },
@@ -485,65 +496,101 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _signOut() async {
-    // Parol box'ni tozalaymiz
-    final box = await Hive.openBox(passwordBoxName);
-    await box.clear();
-    
-    // Firebase va Google'dan chiqish
-    await AuthService.signOut();
-    
-    // LoginScreen'ga qaytish
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(
-          onThemeChanged: widget.onThemeChanged,
-          currentTheme: _currentTheme,
+    try {
+      final box = await Hive.openBox(passwordBoxName);
+      await box.clear();
+
+      await AuthService.signOut();
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            onThemeChanged: widget.onThemeChanged,
+            currentTheme: _currentTheme,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      print('Chiqishda xatolik: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Xatolik: $e')),
+      );
+    }
   }
 
   void _showSettingsSheet() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1B2E) : Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Sozlamalar',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.lock, color: Colors.indigo),
-              title: Text('Parolni o\'zgartirish', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.settings, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Sozlamalar',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _SettingsTile(
+              icon: Icons.lock,
+              iconColor: AppTheme.primaryColor,
+              title: 'Parolni o\'zgartirish',
               onTap: () {
                 Navigator.pop(context);
                 _changePassword();
               },
             ),
-            ListTile(
-              leading: Icon(
-                _currentTheme == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
-                color: Colors.indigo,
-              ),
-              title: Text('Qorong\'u rejim', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-              subtitle: Text(
-                _currentTheme == ThemeMode.dark ? 'Yoqilgan' : 'O\'chirilgan',
-                style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-              ),
+            _SettingsTile(
+              icon: _currentTheme == ThemeMode.dark ? Icons.dark_mode : Icons.light_mode,
+              iconColor: AppTheme.infoColor,
+              title: 'Qorong\'u rejim',
+              subtitle: _currentTheme == ThemeMode.dark ? 'Yoqilgan' : 'O\'chirilgan',
               trailing: Switch(
                 value: _currentTheme == ThemeMode.dark,
+                activeColor: AppTheme.primaryColor,
                 onChanged: (value) {
                   final newMode = value ? ThemeMode.dark : ThemeMode.light;
                   setState(() {
@@ -553,18 +600,21 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.info, color: Colors.blue),
-              title: Text('Ilova $_daysCount kundan beri ishlayapti', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+            _SettingsTile(
+              icon: Icons.info,
+              iconColor: AppTheme.infoColor,
+              title: 'Ilova $_daysCount kundan beri ishlayapti',
               subtitle: _startDate != null
-                  ? Text('Boshlangan sana: ${DateFormat('dd.MM.yyyy').format(_startDate!)}', 
-                      style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]))
+                  ? 'Boshlangan sana: ${DateFormat('dd.MM.yyyy').format(_startDate!)}'
                   : null,
               onTap: () => Navigator.pop(context),
             ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Chiqish', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.logout,
+              iconColor: AppTheme.errorColor,
+              title: 'Chiqish',
+              titleColor: AppTheme.errorColor,
               onTap: () {
                 Navigator.pop(context);
                 _signOut();
@@ -580,13 +630,19 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F1020) : const Color(0xFFF8F9FE),
       appBar: AppBar(
-        title: const Text('Kunlik xarajatlar', style: TextStyle(color: Colors.white)),
-        backgroundColor: isDark ? const Color(0xFF1a1a2e) : const Color(0xFF667eea),
+        title: const Text(
+          'Kunlik xarajatlar',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
@@ -617,79 +673,60 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.settings),
             onPressed: _showSettingsSheet,
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark 
-                ? [const Color(0xFF1a1a2e), const Color(0xFF16213e)]
-                : [const Color(0xFF667eea), const Color(0xFF764ba2)],
-          ),
-        ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Gradient Card - Jami xarajat
+            GradientCard(
+              title: 'Jami xarajat',
+              value: '${formatMoney(totalExpenses)} so\'m',
+              icon: Icons.account_balance_wallet,
+              gradient: AppTheme.primaryGradient,
+            ),
+            const SizedBox(height: 12),
+
+            // Kunlar soni
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-              child: Column(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1A1B2E) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: AppTheme.cardShadow,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Jami xarajat',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  const Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
+                  const SizedBox(width: 8),
                   Text(
-                    '${formatMoney(totalExpenses)} so\'m',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.calendar_today, size: 16, color: Colors.white),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_daysCount} kundan beri nazoratda',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                    '${_daysCount} kundan beri nazoratda',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            
-            Container(
-              height: 55,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
+            const SizedBox(height: 20),
+
+            // Kategoriya filtrlari
+            const Text(
+              'Kategoriyalar',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 44,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: categories.length,
@@ -697,30 +734,39 @@ class _HomePageState extends State<HomePage> {
                   final category = categories[index];
                   final isSelected = selectedCategory == category;
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedCategory = category;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected ? Colors.white : Colors.white54,
-                            width: 1.5,
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            selectedCategory = category;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(22),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          decoration: BoxDecoration(
+                            gradient: isSelected ? AppTheme.primaryGradient : null,
+                            color: isSelected ? null : (isDark ? const Color(0xFF1A1B2E) : Colors.white),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.transparent
+                                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
+                              width: 1.5,
+                            ),
+                            boxShadow: isSelected ? AppTheme.softShadow : [],
                           ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            category,
-                            style: TextStyle(
-                              color: isSelected ? Colors.indigo : Colors.white,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 14,
+                          child: Center(
+                            child: Text(
+                              category,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -730,10 +776,19 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
+            const SizedBox(height: 16),
 
-            Container(
-              height: 45,
-              padding: const EdgeInsets.symmetric(vertical: 5),
+            // Sana filtrlari
+            const Text(
+              'Sana bo\'yicha',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 40,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemCount: dateFilters.length,
@@ -741,30 +796,38 @@ class _HomePageState extends State<HomePage> {
                   final filter = dateFilters[index];
                   final isSelected = selectedDateFilter == filter;
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedDateFilter = filter;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: isSelected ? Colors.white : Colors.white54,
-                            width: 1.5,
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            selectedDateFilter = filter;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            gradient: isSelected ? AppTheme.accentGradient : null,
+                            color: isSelected ? null : (isDark ? const Color(0xFF1A1B2E) : Colors.white),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.transparent
+                                  : (isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
+                              width: 1.5,
+                            ),
                           ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            filter,
-                            style: TextStyle(
-                              color: isSelected ? Colors.indigo : Colors.white,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 13,
+                          child: Center(
+                            child: Text(
+                              filter,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black87),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ),
@@ -774,137 +837,76 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
+            const SizedBox(height: 20),
 
-            Expanded(
-              child: Container(
+            // Xarajatlar ro'yxati
+            if (filteredExpenses.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(40),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(0),
-                    bottomRight: Radius.circular(0),
-                  ),
+                  color: isDark ? const Color(0xFF1A1B2E) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: AppTheme.cardShadow,
                 ),
-                child: filteredExpenses.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.receipt_long, size: 64, color: isDark ? Colors.grey[700] : Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Hali xarajat qo\'shilmagan',
-                              style: TextStyle(fontSize: 16, color: isDark ? Colors.grey[500] : Colors.grey),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(10),
-                        itemCount: filteredExpenses.length,
-                        itemBuilder: (context, index) {
-                          final expense = filteredExpenses[index];
-                          final icon = categoryIcons[expense.category] ?? Icons.category;
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            elevation: 3,
-                            color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(icon, color: Colors.indigo, size: 28),
-                                  ),
-                                  const SizedBox(width: 15),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          expense.displayName,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: isDark ? Colors.white : Colors.black87,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          expense.description,
-                                          style: TextStyle(
-                                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          DateFormat('dd.MM.yyyy HH:mm').format(expense.date),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isDark ? Colors.grey[500] : Colors.grey[500],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '${formatMoney(expense.amount)} so\'m',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          color: Colors.indigo,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit, size: 20, color: Colors.orange),
-                                            onPressed: () async {
-                                              final ok = await askPassword();
-                                              if (ok) _showEditDialog(context, expense);
-                                            },
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                                            onPressed: () async {
-                                              final ok = await askPassword();
-                                              if (ok) {
-                                                deleteExpense(expense.id);
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('O\'chirildi')),
-                                                );
-                                              }
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.receipt_long,
+                      size: 64,
+                      color: Colors.grey.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Hali xarajat qo\'shilmagan',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.withOpacity(0.7),
                       ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredExpenses.length,
+                itemBuilder: (context, index) {
+                  final expense = filteredExpenses[index];
+                  final icon = categoryIcons[expense.category] ?? Icons.category;
+                  final color = categoryColors[expense.category] ?? AppTheme.primaryColor;
+
+                  return ExpenseCard(
+                    title: expense.displayName,
+                    subtitle: expense.description,
+                    amount: '${formatMoney(expense.amount)} so\'m',
+                    date: DateFormat('dd.MM.yyyy HH:mm').format(expense.date),
+                    icon: icon,
+                    iconColor: color,
+                    onEdit: () async {
+                      final ok = await askPassword();
+                      if (ok) _showEditDialog(context, expense);
+                    },
+                    onDelete: () async {
+                      final ok = await askPassword();
+                      if (ok) {
+                        deleteExpense(expense.id);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('O\'chirildi'),
+                            backgroundColor: AppTheme.errorColor,
+                          ),
+                        );
+                      }
+                    },
+                  );
+                },
               ),
-            ),
+            const SizedBox(height: 100),
           ],
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -920,14 +922,14 @@ class _HomePageState extends State<HomePage> {
                 ),
               );
             },
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.pie_chart, color: Colors.indigo, size: 30),
+            backgroundColor: AppTheme.secondaryColor,
+            child: const Icon(Icons.pie_chart, size: 28),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           FloatingActionButton(
             onPressed: () => _showAddExpenseDialog(context),
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.add, color: Colors.indigo, size: 30),
+            backgroundColor: AppTheme.primaryColor,
+            child: const Icon(Icons.add, size: 28),
           ),
         ],
       ),
@@ -946,42 +948,121 @@ class _HomePageState extends State<HomePage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Yangi xarajat qo\'shish'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.add_circle, color: AppTheme.primaryColor),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Yangi xarajat'),
+                ],
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedCat,
-                      decoration: const InputDecoration(labelText: 'Kategoriya', border: OutlineInputBorder()),
-                      items: categories.where((c) => c != 'Barchasi').map((category) => DropdownMenuItem(
-                            value: category,
-                            child: Row(children: [Icon(categoryIcons[category], size: 20), const SizedBox(width: 10), Text(category)]),
-                          )).toList(),
-                      onChanged: (value) {
-                        setState(() { selectedCat = value!; });
-                      },
+                    ModernTextField(
+                      hintText: 'Summani kiriting',
+                      labelText: 'Summa (so\'m)',
+                      prefixIcon: Icons.attach_money,
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.1)
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: selectedCat,
+                        decoration: const InputDecoration(
+                          labelText: 'Kategoriya',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        items: categories
+                            .where((c) => c != 'Barchasi')
+                            .map((category) => DropdownMenuItem(
+                                  value: category,
+                                  child: Row(
+                                    children: [
+                                      Icon(categoryIcons[category], size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(category),
+                                    ],
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedCat = value!;
+                          });
+                        },
+                      ),
                     ),
                     if (selectedCat == 'Yoqilg\'i') ...[
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedFuel,
-                        decoration: const InputDecoration(labelText: 'Yoqilg\'i turi', border: OutlineInputBorder()),
-                        items: fuelTypes.map((fuel) => DropdownMenuItem(value: fuel, child: Text(fuel))).toList(),
-                        onChanged: (value) {
-                          setState(() { selectedFuel = value!; });
-                        },
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.grey.shade200,
+                          ),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedFuel,
+                          decoration: const InputDecoration(
+                            labelText: 'Yoqilg\'i turi',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          items: fuelTypes
+                              .map((fuel) => DropdownMenuItem(
+                                    value: fuel,
+                                    child: Text(fuel),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedFuel = value!;
+                            });
+                          },
+                        ),
                       ),
                     ],
                     const SizedBox(height: 12),
-                    TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Summa (so\'m)', border: OutlineInputBorder()), keyboardType: TextInputType.number),
-                    const SizedBox(height: 12),
-                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Izoh (ixtiyoriy)', border: OutlineInputBorder())),
+                    ModernTextField(
+                      hintText: 'Izoh yozing...',
+                      labelText: 'Izoh (ixtiyoriy)',
+                      prefixIcon: Icons.description,
+                      controller: descriptionController,
+                      maxLines: 3,
+                    ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bekor qilish')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Bekor qilish'),
+                ),
                 ElevatedButton(
                   onPressed: () {
                     if (amountController.text.isNotEmpty) {
@@ -995,6 +1076,12 @@ class _HomePageState extends State<HomePage> {
                       );
                       addExpense(expense);
                       Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Xarajat qo\'shildi!'),
+                          backgroundColor: AppTheme.successColor,
+                        ),
+                      );
                     }
                   },
                   child: const Text('Qo\'shish'),
@@ -1019,42 +1106,121 @@ class _HomePageState extends State<HomePage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Xarajatni tahrirlash'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.edit, color: AppTheme.warningColor),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Tahrirlash'),
+                ],
+              ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<String>(
-                      value: selectedCat,
-                      decoration: const InputDecoration(labelText: 'Kategoriya', border: OutlineInputBorder()),
-                      items: categories.where((c) => c != 'Barchasi').map((category) => DropdownMenuItem(
-                            value: category,
-                            child: Row(children: [Icon(categoryIcons[category], size: 20), const SizedBox(width: 10), Text(category)]),
-                          )).toList(),
-                      onChanged: (value) {
-                        setState(() { selectedCat = value!; });
-                      },
+                    ModernTextField(
+                      hintText: 'Summani kiriting',
+                      labelText: 'Summa (so\'m)',
+                      prefixIcon: Icons.attach_money,
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.1)
+                              : Colors.grey.shade200,
+                        ),
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: selectedCat,
+                        decoration: const InputDecoration(
+                          labelText: 'Kategoriya',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                        items: categories
+                            .where((c) => c != 'Barchasi')
+                            .map((category) => DropdownMenuItem(
+                                  value: category,
+                                  child: Row(
+                                    children: [
+                                      Icon(categoryIcons[category], size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(category),
+                                    ],
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedCat = value!;
+                          });
+                        },
+                      ),
                     ),
                     if (selectedCat == 'Yoqilg\'i') ...[
                       const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedFuel,
-                        decoration: const InputDecoration(labelText: 'Yoqilg\'i turi', border: OutlineInputBorder()),
-                        items: fuelTypes.map((fuel) => DropdownMenuItem(value: fuel, child: Text(fuel))).toList(),
-                        onChanged: (value) {
-                          setState(() { selectedFuel = value!; });
-                        },
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white.withOpacity(0.1)
+                                : Colors.grey.shade200,
+                          ),
+                        ),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedFuel,
+                          decoration: const InputDecoration(
+                            labelText: 'Yoqilg\'i turi',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                          items: fuelTypes
+                              .map((fuel) => DropdownMenuItem(
+                                    value: fuel,
+                                    child: Text(fuel),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedFuel = value!;
+                            });
+                          },
+                        ),
                       ),
                     ],
                     const SizedBox(height: 12),
-                    TextField(controller: amountController, decoration: const InputDecoration(labelText: 'Summa (so\'m)', border: OutlineInputBorder()), keyboardType: TextInputType.number),
-                    const SizedBox(height: 12),
-                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Izoh (ixtiyoriy)', border: OutlineInputBorder())),
+                    ModernTextField(
+                      hintText: 'Izoh yozing...',
+                      labelText: 'Izoh (ixtiyoriy)',
+                      prefixIcon: Icons.description,
+                      controller: descriptionController,
+                      maxLines: 3,
+                    ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Bekor qilish')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Bekor qilish'),
+                ),
                 ElevatedButton(
                   onPressed: () {
                     if (amountController.text.isNotEmpty) {
@@ -1068,7 +1234,12 @@ class _HomePageState extends State<HomePage> {
                       );
                       updateExpense(expense.id, updated);
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tahrirlandi')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Tahrirlandi!'),
+                          backgroundColor: AppTheme.successColor,
+                        ),
+                      );
                     }
                   },
                   child: const Text('Saqlash'),
@@ -1078,6 +1249,91 @@ class _HomePageState extends State<HomePage> {
           },
         );
       },
+    );
+  }
+}
+
+// ============================================
+// Helper Widget: Settings Tile
+// ============================================
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String? subtitle;
+  final Color? titleColor;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    this.titleColor,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.white.withOpacity(0.03) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: titleColor ?? (isDark ? Colors.white : Colors.black87),
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing!,
+              if (trailing == null && onTap != null)
+                Icon(Icons.chevron_right, color: isDark ? Colors.grey[600] : Colors.grey[400]),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

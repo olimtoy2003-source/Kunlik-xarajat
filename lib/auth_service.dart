@@ -54,11 +54,16 @@ class AuthService {
     }
   }
 
-  // To'liq chiqish - Google session ham tozalanadi
   static Future<void> signOut() async {
-    await _auth.signOut();
-    await _googleSignIn.signOut(); // <-- Bu qatorni qaytardik
-    await _googleSignIn.disconnect(); // Google account'ni uzamiz
+    try {
+      // Faqat Firebase va Google Sign-In'dan chiqamiz
+      await _auth.signOut();
+      await _googleSignIn.signOut();
+      // disconnect() ISHLATMAYMIZ - xatolik beradi!
+    } catch (e) {
+      // Xatolikni e'tiborsiz qoldiramiz - ilova ishlashda davom etadi
+      print('Chiqishda xatolik: $e');
+    }
   }
 
   static Stream<User?> authStateChanges() {
