@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "77591465264",
+    "project_id": "kunlik-xarajat",
+    "storage_bucket": "kunlik-xarajat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:77591465264:android:285f6450a1862ac2284cf5",
+        "android_client_info": {
+          "package_name": "com.example.kunlik_xarajatlar"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "77591465264-gultm0150iimij1ofsonu78lumcompoo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kunlik_xarajatlar",
+            "certificate_hash": "6fb760332eea2323c82cc0c86f147ca727f0f1a9"
+          }
+        },
+        {
+          "client_id": "77591465264-9s3kmq90p1sjh9aetjpptdbon0e7qs95.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChQ5bqRa4xyyFJFuXQX0jllJa6a9QaeLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "77591465264-9s3kmq90p1sjh9aetjpptdbon0e7qs95.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

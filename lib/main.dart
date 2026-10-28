@@ -1,13 +1,18 @@
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:convert';
 import 'statistics_screen.dart';
-import 'debt_screen.dart'; // <-- YANGI QO'SHILGAN QATOR (Qarz daftari uchun)
+import 'debt_screen.dart';
+import 'firebase_service.dart';
+import 'auth_service.dart';
+import 'login_screen.dart';
 
 const String expensesBoxName = 'expenses_box';
-const String passwordBoxName = 'password_box';
 const String settingsBoxName = 'settings_box';
+const String passwordBoxName = 'app_password_box';
 
 String formatMoney(double amount) {
   final formatter = NumberFormat('#,###');
@@ -15,11 +20,13 @@ String formatMoney(double amount) {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding); // <-- Splash screen'ni saqlash
+  
+  await Firebase.initializeApp();
   await Hive.initFlutter();
   runApp(const MyApp());
 }
-
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -69,6 +76,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Kunlik xarajatlar',
+      debugShowCheckedModeBanner: false, // <-- Qizil DEBUG yozuvini o'chiradi
       themeMode: _themeMode,
       theme: ThemeData(
         primarySwatch: Colors.indigo,
@@ -87,245 +95,9 @@ class _MyAppState extends State<MyApp> {
           surface: Color(0xFF1E1E1E),
         ),
       ),
-      home: LoginScreen(onThemeChanged: setThemeMode, currentTheme: _themeMode),
-    );
-  }
-}
-
-class LoginScreen extends StatefulWidget {
-  final void Function(ThemeMode) onThemeChanged;
-  final ThemeMode currentTheme;
-
-  const LoginScreen({
-    super.key,
-    required this.onThemeChanged,
-    required this.currentTheme,
-  });
-
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _passwordController = TextEditingController();
-  bool isFirstTime = true;
-  String? savedPassword;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPassword();
-  }
-
-  Future<void> _checkPassword() async {
-    final box = await Hive.openBox(passwordBoxName);
-    final password = box.get('app_password');
-    if (password != null) {
-      setState(() {
-        savedPassword = password;
-        isFirstTime = false;
-      });
-    }
-  }
-
-  Future<void> _savePassword(String password) async {
-    final box = await Hive.openBox(passwordBoxName);
-    await box.put('app_password', password);
-  }
-
-  Future<void> _resetPassword() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: Colors.red),
-            SizedBox(width: 10),
-            Text('Diqqat!'),
-          ],
-        ),
-        content: const Text(
-          'Parolni tiklash uchun barcha ma\'lumotlar (xarajatlar va parol) o\'chiriladi. Davom etasizmi?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Bekor qilish'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Ha, o\'chirish'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final expensesBox = await Hive.openBox(expensesBoxName);
-      final passwordBox = await Hive.openBox(passwordBoxName);
-      final settingsBox = await Hive.openBox(settingsBoxName);
-      
-      await expensesBox.clear();
-      await passwordBox.clear();
-      await settingsBox.clear();
-      
-      await expensesBox.close();
-      await passwordBox.close();
-      await settingsBox.close();
-
-      setState(() {
-        savedPassword = null;
-        isFirstTime = true;
-        _passwordController.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Barcha ma\'lumotlar o\'chirildi. Yangi parol o\'rnating.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-          ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(30),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.lock_outline, size: 80, color: Colors.white),
-                const SizedBox(height: 20),
-                Text(
-                  isFirstTime ? 'Parol o\'rnating' : 'Ilovaga kirish',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  isFirstTime
-                      ? 'Ilovani himoyalash uchun parol yarating'
-                      : 'Davom etish uchun parolni kiriting',
-                  style: const TextStyle(fontSize: 16, color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 30),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    color: Colors.white,
-                    letterSpacing: 8,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '****',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.2),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 20),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      final password = _passwordController.text.trim();
-                      if (password.length < 4) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Parol kamida 4 ta raqam bo\'lishi kerak!'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-
-                      if (isFirstTime) {
-                        _savePassword(password).then((_) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => HomePage(onThemeChanged: widget.onThemeChanged, currentTheme: widget.currentTheme),
-                            ),
-                          );
-                        });
-                      } else {
-                        if (password == savedPassword) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => HomePage(onThemeChanged: widget.onThemeChanged, currentTheme: widget.currentTheme),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Parol noto\'g\'ri!'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          _passwordController.clear();
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.indigo,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: Text(
-                      isFirstTime ? 'Parolni saqlash' : 'Kirish',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isFirstTime) ...[
-                  const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: _resetPassword,
-                    child: const Text(
-                      'Parolni unutdingizmi?',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
+      home: LoginScreen(
+        onThemeChanged: setThemeMode,
+        currentTheme: _themeMode,
       ),
     );
   }
@@ -397,7 +169,6 @@ class _HomePageState extends State<HomePage> {
   String selectedCategory = 'Barchasi';
   String selectedDateFilter = 'Barchasi';
   late Box _expensesBox;
-  String? _appPassword;
   DateTime? _startDate;
   int _daysCount = 0;
   late ThemeMode _currentTheme;
@@ -433,27 +204,29 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _currentTheme = widget.currentTheme;
     _loadData();
-    _loadPassword();
     _loadStartDate();
   }
 
   Future<void> _loadData() async {
     _expensesBox = await Hive.openBox(expensesBoxName);
-    final String? savedData = _expensesBox.get('expenses_list');
     
-    if (savedData != null) {
-      final List<dynamic> decodedData = jsonDecode(savedData);
+    final firebaseExpenses = await FirebaseService.loadExpenses();
+    
+    if (firebaseExpenses.isNotEmpty) {
       setState(() {
-        expenses = decodedData.map((e) => Expense.fromMap(e)).toList();
+        expenses = firebaseExpenses.map((e) => Expense.fromMap(e)).toList();
       });
+      final String encodedData = jsonEncode(firebaseExpenses);
+      await _expensesBox.put('expenses_list', encodedData);
+    } else {
+      final String? savedData = _expensesBox.get('expenses_list');
+      if (savedData != null) {
+        final List<dynamic> decodedData = jsonDecode(savedData);
+        setState(() {
+          expenses = decodedData.map((e) => Expense.fromMap(e)).toList();
+        });
+      }
     }
-  }
-
-  Future<void> _loadPassword() async {
-    final box = await Hive.openBox(passwordBoxName);
-    setState(() {
-      _appPassword = box.get('app_password');
-    });
   }
 
   Future<void> _loadStartDate() async {
@@ -478,11 +251,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _saveData() async {
     final String encodedData = jsonEncode(expenses.map((e) => e.toMap()).toList());
     await _expensesBox.put('expenses_list', encodedData);
-  }
-
-  Future<void> _savePassword(String password) async {
-    final box = await Hive.openBox(passwordBoxName);
-    await box.put('app_password', password);
+    
+    final List<Map<String, dynamic>> expensesMaps = expenses.map((e) => e.toMap()).toList();
+    await FirebaseService.saveExpenses(expensesMaps);
   }
 
   @override
@@ -556,6 +327,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<bool> askPassword() async {
+    final box = await Hive.openBox(passwordBoxName);
+    final savedPassword = box.get('app_password');
+    
     final controller = TextEditingController();
     bool result = false;
 
@@ -589,7 +363,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (controller.text == _appPassword) {
+                if (controller.text == savedPassword) {
                   result = true;
                   Navigator.pop(context);
                 } else {
@@ -612,6 +386,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _changePassword() async {
+    final box = await Hive.openBox(passwordBoxName);
+    final savedPassword = box.get('app_password');
+    
     final currentController = TextEditingController();
     final newController = TextEditingController();
     final confirmController = TextEditingController();
@@ -661,8 +438,8 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Bekor qilish'),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (currentController.text != _appPassword) {
+              onPressed: () async {
+                if (currentController.text != savedPassword) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Joriy parol noto\'g\'ri!'),
@@ -690,24 +467,40 @@ class _HomePageState extends State<HomePage> {
                   return;
                 }
 
-                _savePassword(newController.text).then((_) {
-                  setState(() {
-                    _appPassword = newController.text;
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Parol muvaffaqiyatli o\'zgartirildi!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                });
+                await box.put('app_password', newController.text);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Parol muvaffaqiyatli o\'zgartirildi!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               },
               child: const Text('Saqlash'),
             ),
           ],
         );
       },
+    );
+  }
+
+  Future<void> _signOut() async {
+    // Parol box'ni tozalaymiz
+    final box = await Hive.openBox(passwordBoxName);
+    await box.clear();
+    
+    // Firebase va Google'dan chiqish
+    await AuthService.signOut();
+    
+    // LoginScreen'ga qaytish
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          onThemeChanged: widget.onThemeChanged,
+          currentTheme: _currentTheme,
+        ),
+      ),
     );
   }
 
@@ -769,6 +562,14 @@ class _HomePageState extends State<HomePage> {
                   : null,
               onTap: () => Navigator.pop(context),
             ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Chiqish', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _signOut();
+              },
+            ),
             const SizedBox(height: 20),
           ],
         ),
@@ -787,9 +588,6 @@ class _HomePageState extends State<HomePage> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          // ==========================================
-          // YANGI QO'SHILGAN QARZ DAFTARI TUGMASI
-          // ==========================================
           IconButton(
             icon: const Icon(Icons.account_balance_wallet),
             tooltip: 'Qarz daftari',
@@ -805,7 +603,6 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          // ==========================================
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
             onPressed: () {

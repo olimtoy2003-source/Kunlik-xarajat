@@ -1,6 +1,8 @@
 name: kunlik_xarajatlar
 description: Kunlik xarajatlarni hisoblash ilovasi
+
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
@@ -13,6 +15,11 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   fl_chart: ^0.65.0
+  firebase_core: ^3.6.0
+  cloud_firestore: ^5.4.4
+  firebase_auth: ^5.3.1
+  google_sign_in: ^6.2.1
+  flutter_native_splash: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -21,9 +28,22 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
 
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: "assets/icon.png"
-  min_sdk_android: 21
+flutter_native_splash:
+  # Kun (light) rejim uchun
+  color: "#667eea"
+  image: assets/splash_logo.png
+  
+  # Tun (dark) rejim uchun
+  color_dark: "#1a1a2e"
+  image_dark: assets/splash_logo.png
+
+  android_12:
+    color: "#667eea"
+    color_dark: "#1a1a2e"
+    icon_background_color: "#667eea"
+    icon_background_color_dark: "#1a1a2e"
+    image: assets/splash_logo.png
+    image_dark: assets/splash_logo.png

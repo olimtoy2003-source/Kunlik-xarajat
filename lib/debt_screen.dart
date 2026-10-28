@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import 'main.dart'; // formatMoney va passwordBoxName uchun
+import 'main.dart';
+import 'firebase_service.dart';
 
 const String debtsBoxName = 'debts_box';
+const String passwordBoxName = 'app_password_box';
 
-// ============================================
-// PAYMENT CLASS - Qisman to'lovlar uchun
-// ============================================
 class Payment {
   double amount;
   DateTime date;
@@ -37,20 +36,17 @@ class Payment {
   }
 }
 
-// ============================================
-// DEBT CLASS - Qarz modeli
-// ============================================
 class Debt {
   String id;
   String personName;
-  double amount; // Boshlang'ich summa
-  double paidAmount; // To'langan summa
-  String type; // 'owed_to_me' yoki 'owed_by_me'
+  double amount;
+  double paidAmount;
+  String type;
   String description;
   DateTime date;
   DateTime? dueDate;
   bool isSettled;
-  List<Payment> payments; // Qisman to'lovlar tarixi
+  List<Payment> payments;
 
   Debt({
     required this.id,
@@ -101,9 +97,6 @@ class Debt {
   }
 }
 
-// ============================================
-// DEBT SCREEN - Qarz daftari ekrani
-// ============================================
 class DebtScreen extends StatefulWidget {
   final void Function(ThemeMode) onThemeChanged;
   final ThemeMode currentTheme;
@@ -133,12 +126,23 @@ class _DebtScreenState extends State<DebtScreen> {
 
   Future<void> _loadData() async {
     _debtsBox = await Hive.openBox(debtsBoxName);
-    final String? savedData = _debtsBox.get('debts_list');
-    if (savedData != null) {
-      final List<dynamic> decodedData = jsonDecode(savedData);
+    
+    final firebaseDebts = await FirebaseService.loadDebts();
+    
+    if (firebaseDebts.isNotEmpty) {
       setState(() {
-        debts = decodedData.map((e) => Debt.fromMap(e)).toList();
+        debts = firebaseDebts.map((e) => Debt.fromMap(e)).toList();
       });
+      final String encodedData = jsonEncode(firebaseDebts);
+      await _debtsBox.put('debts_list', encodedData);
+    } else {
+      final String? savedData = _debtsBox.get('debts_list');
+      if (savedData != null) {
+        final List<dynamic> decodedData = jsonDecode(savedData);
+        setState(() {
+          debts = decodedData.map((e) => Debt.fromMap(e)).toList();
+        });
+      }
     }
   }
 
@@ -152,6 +156,9 @@ class _DebtScreenState extends State<DebtScreen> {
   Future<void> _saveData() async {
     final String encodedData = jsonEncode(debts.map((e) => e.toMap()).toList());
     await _debtsBox.put('debts_list', encodedData);
+    
+    final List<Map<String, dynamic>> debtsMaps = debts.map((e) => e.toMap()).toList();
+    await FirebaseService.saveDebts(debtsMaps);
   }
 
   void addDebt(Debt debt) {
@@ -178,7 +185,6 @@ class _DebtScreenState extends State<DebtScreen> {
     _saveData();
   }
 
-  // YANGI FUNKSIYA: Qisman to'lov qo'shish
   void addPayment(String debtId, double paymentAmount, String note) {
     setState(() {
       final index = debts.indexWhere((e) => e.id == debtId);
@@ -299,7 +305,6 @@ class _DebtScreenState extends State<DebtScreen> {
     return result;
   }
 
-  // YANGI FUNKSIYA: Qisman to'lov dialogi
   void _showAddPaymentDialog(BuildContext context, Debt debt) {
     final amountController = TextEditingController();
     final noteController = TextEditingController();
@@ -403,7 +408,6 @@ class _DebtScreenState extends State<DebtScreen> {
         ),
         child: Column(
           children: [
-            // Jami hisob-kitob
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -465,7 +469,6 @@ class _DebtScreenState extends State<DebtScreen> {
                 ],
               ),
             ),
-            // Filterlar
             Container(
               height: 45,
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -479,7 +482,6 @@ class _DebtScreenState extends State<DebtScreen> {
                 ],
               ),
             ),
-            // Ro'yxat
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -508,7 +510,7 @@ class _DebtScreenState extends State<DebtScreen> {
                         itemBuilder: (context, index) {
                           final debt = filteredDebts[index];
                           final isOwedToMe = debt.type == 'owed_to_me';
-                          final progress = debt.amount > 0 ? (debt.paidAmount / debt.amount).toDouble() : 0.0;
+                          final progress = debt.amount > 0 ? debt.paidAmount / debt.amount : 0;
 
                           return Card(
                             margin: const EdgeInsets.symmetric(vertical: 6),
@@ -584,14 +586,12 @@ class _DebtScreenState extends State<DebtScreen> {
                                       ),
                                     ],
                                   ),
-
-                                  // Progress bar
                                   if (debt.paidAmount > 0) ...[
                                     const SizedBox(height: 12),
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
                                       child: LinearProgressIndicator(
-                                        value: progress,
+                                        value: progress.toDouble(),
                                         backgroundColor: Colors.grey[300],
                                         valueColor: AlwaysStoppedAnimation<Color>(
                                           isOwedToMe ? Colors.green : Colors.red,
@@ -621,7 +621,6 @@ class _DebtScreenState extends State<DebtScreen> {
                                       ],
                                     ),
                                   ],
-
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
@@ -647,8 +646,6 @@ class _DebtScreenState extends State<DebtScreen> {
                                       ],
                                     ],
                                   ),
-
-                                  // To'lovlar tarixi
                                   if (debt.payments.isNotEmpty) ...[
                                     const SizedBox(height: 12),
                                     Container(
@@ -705,7 +702,6 @@ class _DebtScreenState extends State<DebtScreen> {
                                       ),
                                     ),
                                   ],
-
                                   const SizedBox(height: 12),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.end,
